@@ -116,6 +116,8 @@ snd_fruitbounce = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", 
 snd_eatfruit = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "eatfruit.wav"))
 snd_extralife = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "extralife.wav"))
 snd_love = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "All You Need Is Love.wav"))
+snd_accelerate = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "accelerate.wav"))
+snd_invisibility = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "invisibility.wav"))
 
 ghostcolor = {
     0: (255, 0, 0, 255),
@@ -999,6 +1001,7 @@ class pacman:
         # 检查是否可以重新触发隐身
         if self.invis_ready and thisGame.score - self.last_score_when_invis >= 200:
             self.invisible_timer = 120  # 3秒隐身
+            snd_invisibility.play()
             self.invis_ready = False
         # 每帧更新隐身时间
         if self.invisible_timer > 0:
@@ -1017,6 +1020,7 @@ class pacman:
         # 检查是否可以重新触发加速（只在准备好且得了足够分数后才触发）
         if self.boost_ready and thisGame.score - self.last_score_when_boost >= 100:
             self.speed_boost_timer = 120  # 开启 3 秒加速
+            snd_accelerate.play()
             self.boost_ready = False  # 再次锁定，等这轮结束后才能继续
 
         # 每帧更新加速计时
@@ -1102,7 +1106,7 @@ class pacman:
 
         # deal with fruit timer
         thisGame.fruitTimer += 1
-        if thisGame.fruitTimer == 38:
+        if thisGame.fruitTimer == 380:
             pathwayPair = thisLevel.GetPathwayPairPos()
 
             if not pathwayPair == False:
