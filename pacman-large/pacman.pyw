@@ -107,6 +107,8 @@ snd_levelintro = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "
 snd_default = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "default.wav"))
 snd_extrapac = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "extrapac.wav"))
 snd_gh2gohome = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "gh2gohome.wav"))
+# 冷冻音效
+snd_freeze = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "freeze.wav"))
 snd_death = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "death.wav"))
 snd_powerpellet = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "powerpellet.wav"))
 snd_eatgh = pygame.mixer.Sound(os.path.join(SCRIPT_PATH, "res", "sounds", "eatgh2.wav"))
@@ -136,9 +138,6 @@ class game:
         self.levelNum = 0
         self.score = 0
         self.lives = 3
-
-        # 冻结
-        # self.freeze_checkpoint = False
 
         self.mode = 0
         self.modeTimer = 0
@@ -626,13 +625,6 @@ class ghost:
 
         self.id = ghostID
 
-        # 冻结
-        # self.frozen_timer = 0
-
-        # ghost "state" variable
-        # 1 = normal
-        # 2 = vulnerable
-        # 3 = spectacles
         self.state = 1
 
         self.homeX = 0
@@ -656,6 +648,7 @@ class ghost:
         self.animFrame = 1
         self.animDelay = 0
 
+    # gosdraw
     def Draw(self):
         global rect_list
         pupilSet = None
@@ -690,26 +683,60 @@ class ghost:
                 self.anim[self.animFrame].set_at((x + 9, y), (0, 0, 255, 255))
         # -- end ghost eyes
 
+        # if self.state == 1:
+        #     # draw regular ghost (this one)
+        #     screen.blit(self.anim[self.animFrame],
+        #                 (self.x - thisGame.screenPixelPos[0], self.y - thisGame.screenPixelPos[1]))
+
         if self.state == 1:
             # draw regular ghost (this one)
-            screen.blit(self.anim[self.animFrame],
+            ghost_img = self.anim[self.animFrame].copy()
+
+            # 如果玩家正在冷冻幽灵，给幽灵图像加蓝色滤镜
+            if player.freeze_timer > 0:
+                blue_overlay = pygame.Surface(ghost_img.get_size(), pygame.SRCALPHA)
+                blue_overlay.fill((0, 180, 255, 100))  # 半透明蓝色
+                ghost_img.blit(blue_overlay, (0, 0))
+
+            screen.blit(ghost_img,
                         (self.x - thisGame.screenPixelPos[0], self.y - thisGame.screenPixelPos[1]))
+
         elif self.state == 2:
             # draw vulnerable ghost
 
-            if thisGame.ghostTimer > 100:
-                # blue
-                screen.blit(ghosts[4].anim[self.animFrame],
-                            (self.x - thisGame.screenPixelPos[0], self.y - thisGame.screenPixelPos[1]))
+            # if thisGame.ghostTimer > 100:
+            #     # blue
+            #     screen.blit(ghosts[4].anim[self.animFrame],
+            #                 (self.x - thisGame.screenPixelPos[0], self.y - thisGame.screenPixelPos[1]))
+            # else:
+            #     # blue/white flashing
+            #     tempTimerI = int(thisGame.ghostTimer / 10)
+            #     if tempTimerI == 1 or tempTimerI == 3 or tempTimerI == 5 or tempTimerI == 7 or tempTimerI == 9:
+            #         screen.blit(ghosts[5].anim[self.animFrame],
+            #                     (self.x - thisGame.screenPixelPos[0], self.y - thisGame.screenPixelPos[1]))
+            #     else:
+            #         screen.blit(ghosts[4].anim[self.animFrame],
+            #                     (self.x - thisGame.screenPixelPos[0], self.y - thisGame.screenPixelPos[1]))
+            pos = (self.x - thisGame.screenPixelPos[0], self.y - thisGame.screenPixelPos[1])
+
+            if player.freeze_timer > 0:
+                # ✅ 虚弱 + 冷冻状态：固定青色幽灵
+                frozen_img = ghosts[4].anim[self.animFrame].copy()
+                cyan_overlay = pygame.Surface(frozen_img.get_size(), pygame.SRCALPHA)
+                cyan_overlay.fill((0, 255, 255, 120))  # 半透明青色叠加
+                frozen_img.blit(cyan_overlay, (0, 0))
+                screen.blit(frozen_img, pos)
+
             else:
-                # blue/white flashing
-                tempTimerI = int(thisGame.ghostTimer / 10)
-                if tempTimerI == 1 or tempTimerI == 3 or tempTimerI == 5 or tempTimerI == 7 or tempTimerI == 9:
-                    screen.blit(ghosts[5].anim[self.animFrame],
-                                (self.x - thisGame.screenPixelPos[0], self.y - thisGame.screenPixelPos[1]))
+                # ✅ 正常虚弱状态：蓝 ↔ 白 闪烁
+                if thisGame.ghostTimer > 100:
+                    screen.blit(ghosts[4].anim[self.animFrame], pos)
                 else:
-                    screen.blit(ghosts[4].anim[self.animFrame],
-                                (self.x - thisGame.screenPixelPos[0], self.y - thisGame.screenPixelPos[1]))
+                    tempTimerI = int(thisGame.ghostTimer / 10)
+                    if tempTimerI in [1, 3, 5, 7, 9]:
+                        screen.blit(ghosts[5].anim[self.animFrame], pos)  # 白
+                    else:
+                        screen.blit(ghosts[4].anim[self.animFrame], pos)  # 蓝
 
         elif self.state == 3:
             # draw glasses
@@ -733,11 +760,6 @@ class ghost:
 
     #gosmove
     def Move(self):
-
-        # 冻结
-        # if self.frozen_timer > 0:
-        #     self.frozen_timer -= 1
-        #     return  # 跳过本帧移动
 
         self.x += self.velX
         self.y += self.velY
@@ -763,75 +785,43 @@ class ghost:
                 self.FollowNextPathWay()
 
     def FollowNextPathWay(self):
-        if self.currentPath and len(self.currentPath) > 0:
-            direction = self.currentPath[0]
-            self.currentPath = self.currentPath[1:]
+        # print "Ghost " + str(self.id) + " rem: " + self.currentPath
+        # only follow this pathway if there is a possible path found!
+        if not self.currentPath == False:
 
-            if direction == "L":
-                self.velX, self.velY = -self.speed, 0
-            elif direction == "R":
-                self.velX, self.velY = self.speed, 0
-            elif direction == "U":
-                self.velX, self.velY = 0, -self.speed
-            elif direction == "D":
-                self.velX, self.velY = 0, self.speed
+            if len(self.currentPath) > 0:
+                if self.currentPath[0] == "L":
+                    (self.velX, self.velY) = (-self.speed, 0)
+                elif self.currentPath[0] == "R":
+                    (self.velX, self.velY) = (self.speed, 0)
+                elif self.currentPath[0] == "U":
+                    (self.velX, self.velY) = (0, -self.speed)
+                elif self.currentPath[0] == "D":
+                    (self.velX, self.velY) = (0, self.speed)
 
-        else:
-            if self.state == 3:
-                self.state = 1
-                self.speed = self.speed / 4
-                self.velX = self.velY = 0
-                return  # ✅ 到达目标，不再递归
-
-            # 获取目标路径
-            target = (player.nearestRow, player.nearestCol)
-            new_path = path.FindPath((self.nearestRow, self.nearestCol), target)
-
-            # ✅ 检查是否真的找到路径
-            if new_path:
-                self.currentPath = new_path
-                self.FollowNextPathWay()
             else:
-                self.velX = self.velY = 0  # 停止移动
+                # this ghost has reached his destination!!
+                if not self.state == 3:
+                    # chase pac-man
+                    self.currentPath = path.FindPath((self.nearestRow, self.nearestCol),
+                                                     (player.nearestRow, player.nearestCol))
+                    self.FollowNextPathWay()
 
-    # def FollowNextPathWay(self):
-    #     # print "Ghost " + str(self.id) + " rem: " + self.currentPath
-    #     # only follow this pathway if there is a possible path found!
-    #     if not self.currentPath == False:
-    #
-    #         if len(self.currentPath) > 0:
-    #             if self.currentPath[0] == "L":
-    #                 (self.velX, self.velY) = (-self.speed, 0)
-    #             elif self.currentPath[0] == "R":
-    #                 (self.velX, self.velY) = (self.speed, 0)
-    #             elif self.currentPath[0] == "U":
-    #                 (self.velX, self.velY) = (0, -self.speed)
-    #             elif self.currentPath[0] == "D":
-    #                 (self.velX, self.velY) = (0, self.speed)
-    #
-    #         else:
-    #             # this ghost has reached his destination!!
-    #             if not self.state == 3:
-    #                 # chase pac-man
-    #                 self.currentPath = path.FindPath((self.nearestRow, self.nearestCol),
-    #                                                  (player.nearestRow, player.nearestCol))
-    #                 self.FollowNextPathWay()
-    #
-    #             else:
-    #                 # glasses found way back to ghost box
-    #                 self.state = 1
-    #                 self.speed = self.speed / 4
-    #
-    #                 # give ghost a path to a random spot (containing a pellet)
-    #                 (randRow, randCol) = (0, 0)
-    #
-    #                 while not thisLevel.GetMapTile((randRow, randCol)) == tileID['pellet'] or (randRow, randCol) == (
-    #                         0, 0):
-    #                     randRow = random.randint(1, thisLevel.lvlHeight - 2)
-    #                     randCol = random.randint(1, thisLevel.lvlWidth - 2)
-    #
-    #                 self.currentPath = path.FindPath((self.nearestRow, self.nearestCol), (randRow, randCol))
-    #                 self.FollowNextPathWay()
+                else:
+                    # glasses found way back to ghost box
+                    self.state = 1
+                    self.speed = self.speed / 4
+
+                    # give ghost a path to a random spot (containing a pellet)
+                    (randRow, randCol) = (0, 0)
+
+                    while not thisLevel.GetMapTile((randRow, randCol)) == tileID['pellet'] or (randRow, randCol) == (
+                            0, 0):
+                        randRow = random.randint(1, thisLevel.lvlHeight - 2)
+                        randCol = random.randint(1, thisLevel.lvlWidth - 2)
+
+                    self.currentPath = path.FindPath((self.nearestRow, self.nearestCol), (randRow, randCol))
+                    self.FollowNextPathWay()
 
 
 class fruit:
@@ -965,6 +955,9 @@ class pacman:
         self.invis_ready = True
         self.last_score_when_invis = 0
 
+        # 冷冻
+        self.freeze_timer = 0  # ✅ 必须保留，用于控制冷冻持续时间
+
         self.nearestRow = 0
         self.nearestCol = 0
 
@@ -1082,11 +1075,14 @@ class pacman:
             # check for collisions with the fruit
             if thisFruit.active:
                 if thisLevel.CheckIfHit((self.x, self.y), (thisFruit.x, thisFruit.y), TILE_WIDTH / 2):
-                    thisGame.AddToScore(2500)
+                    self.freeze_timer = 120  # 冻结 3 秒（40 fps × 3）
+                    self.freeze_ready = False  # 不允许立即再次冷冻（可选）
+                    self.last_score_when_freeze = thisGame.score  # 可选，用于保持得分机制一致
+
                     thisFruit.active = False
                     thisGame.fruitTimer = 0
-                    thisGame.fruitScoreTimer = 80
-                    snd_eatfruit.play()
+                    # snd_eatfruit.play()
+                    snd_freeze.play()  # 播放幽灵冻结音效
 
         else:
             # we're going to hit a wall -- stop moving
@@ -1106,7 +1102,7 @@ class pacman:
 
         # deal with fruit timer
         thisGame.fruitTimer += 1
-        if thisGame.fruitTimer == 380:
+        if thisGame.fruitTimer == 38:
             pathwayPair = thisLevel.GetPathwayPairPos()
 
             if not pathwayPair == False:
@@ -1151,13 +1147,6 @@ class pacman:
             pac_img = pac_img.copy()
             pac_img.set_alpha(100)  # 整体透明度 0~255，越小越透明
 
-        # 加速显示
-        # if self.speed_boost_timer > 0:
-        #     # 制作一个发红的效果图层
-        #     red_overlay = pygame.Surface(pac_img.get_size(), pygame.SRCALPHA)
-        #     red_overlay.fill((255, 0, 0, 90))  # 半透明红色
-        #     pac_img = pac_img.copy()
-        #     pac_img.blit(red_overlay, (0, 0))
 
         if self.speed_boost_timer > 0:
             for i, (sx, sy) in enumerate(self.shadow_trail):
@@ -1769,23 +1758,21 @@ while True:
             thisGame.SetMode(1)
 
     if thisGame.mode == 1:
-        # 分数达到 200 时冻结幽灵
-        # if thisGame.score // 200 > thisGame.freeze_checkpoint:
-        #     for g in ghosts:
-        #         g.frozen_timer = 120
-        #     thisGame.freeze_checkpoint = thisGame.score // 200
-        #
-        # player.Move()
-        # for g in ghosts:
-        #     g.Move()
+
 
         # normal gameplay mode
         CheckInputs()
         thisGame.modeTimer += 1
 
         player.Move()
+        # 冷冻倒计时
+        if player.freeze_timer > 0:
+            player.freeze_timer -= 1
         for i in range(0, 4, 1):
-            ghosts[i].Move()
+            # 冷冻
+            if player.freeze_timer == 0:
+                ghosts[i].Move()
+            # ghosts[i].Move()
         thisFruit.Move()
 
     elif thisGame.mode == 2:
@@ -1885,9 +1872,19 @@ while True:
         CheckInputs()
         thisGame.modeTimer += 1
 
+        # player.Move()
+        # for i in range(0, 4, 1):
+        #     ghosts[i].Move()
+
         player.Move()
+        # 冷冻倒计时
+        if player.freeze_timer > 0:
+            player.freeze_timer -= 1
         for i in range(0, 4, 1):
-            ghosts[i].Move()
+            # 冷冻
+            if player.freeze_timer == 0:
+                ghosts[i].Move()
+
         thisFruit.Move()
 
     elif thisGame.mode == 10:
